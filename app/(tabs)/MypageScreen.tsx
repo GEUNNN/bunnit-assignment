@@ -1,12 +1,15 @@
+import React, { FC } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-export default function HomeScreen() {
+const Mypage: FC = () => {
   return (
     <View style={styles.container}>
-      <Text>Home</Text>
+      <Text>Mypage</Text>
     </View>
   );
-}
+};
+
+export default Mypage;
 
 const styles = StyleSheet.create({
   container: {
