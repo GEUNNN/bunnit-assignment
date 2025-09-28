@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { runOnJS, useSharedValue, withTiming } from "react-native-reanimated";
 
 interface CalendarDay {
   day: number;
@@ -11,10 +14,13 @@ interface CalendarDay {
 const CalendarScreen = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isWeekView, setIsWeekView] = useState<boolean>(false);
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
   const today = useMemo(() => new Date(), []);
+
+  const calendarHeight = useSharedValue(300);
+  const translationY = useSharedValue(0);
 
   const calendarData = useMemo((): CalendarDay[] => {
     const year = currentDate.getFullYear();
@@ -60,10 +66,6 @@ const CalendarScreen = () => {
 
     return calendarDays;
   }, [currentDate]);
-
-  const isToday = (date: Date) => {
-    return date.toDateString() === today.toDateString();
-  };
 
   const isSelected = (date: Date) => {
     return selectedDate && date.toDateString() === selectedDate.toDateString();
@@ -123,6 +125,44 @@ const CalendarScreen = () => {
     return style;
   };
 
+  const handleGesture = Gesture.Pan()
+    .onStart(() => {
+      translationY.value = 0;
+    })
+    .onUpdate((e) => {
+      translationY.value = e.translationY;
+    })
+    .onEnd(() => {
+      if (translationY.value < -50) {
+        runOnJS(setIsWeekView)(false);
+        calendarHeight.value = withTiming(300, { duration: 300 });
+      } else if (translationY.value > 50) {
+        runOnJS(setIsWeekView)(true);
+        calendarHeight.value = withTiming(70, { duration: 300 });
+      }
+    });
+
+  const getWeekData = () => {
+    const weeks = [];
+    for (let i = 0; i < calendarData.length; i += 7) {
+      weeks.push(calendarData.slice(i, i + 7));
+    }
+    return weeks;
+  };
+
+  const getTodayWeek = () => {
+    const weeks = getWeekData();
+    const todayWeek = weeks.find((week) =>
+      week.some(
+        (day) =>
+          day.isCurrentMonth && day.date.toDateString() === today.toDateString()
+      )
+    );
+    return todayWeek || weeks[0];
+  };
+
+  const displayData = isWeekView ? getTodayWeek() : calendarData;
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -153,22 +193,24 @@ const CalendarScreen = () => {
         ))}
       </View>
 
-      <View style={styles.calendarGrid}>
-        {calendarData.map((dateInfo, index) => (
-          <TouchableOpacity
-            key={`${dateInfo.date.getTime()}`}
-            style={styles.dayContainer}
-            onPress={() => handleDatePress(dateInfo)}
-            disabled={!dateInfo.isCurrentMonth}
-          >
-            <View style={getDayItemStyle(dateInfo)}>
-              <Text style={getDayTextStyle(dateInfo, index)}>
-                {dateInfo.day}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <GestureDetector gesture={handleGesture}>
+        <View style={styles.calendarGrid}>
+          {displayData.map((dateInfo, index) => (
+            <TouchableOpacity
+              key={`${dateInfo.date.getTime()}`}
+              style={styles.dayContainer}
+              onPress={() => handleDatePress(dateInfo)}
+              disabled={!dateInfo.isCurrentMonth}
+            >
+              <View style={getDayItemStyle(dateInfo)}>
+                <Text style={getDayTextStyle(dateInfo, index)}>
+                  {dateInfo.day}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </GestureDetector>
     </SafeAreaView>
   );
 };
